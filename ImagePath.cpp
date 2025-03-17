@@ -1,13 +1,20 @@
 #include <windows.h>
 #include <iostream>
+#include <string>
 
-void PrintImagePath(HKEY hKey, const std::wstring& subKey) {
+const wchar_t SERVICES_PATH[] = L"SYSTEM\\CurrentControlSet\\Services";
+
+void GetServiceImagePath(HKEY hKey, const std::wstring& serviceName) {
     HKEY hSubKey;
-    if (RegOpenKeyExW(hKey, subKey.c_str(), 0, KEY_QUERY_VALUE, &hSubKey) == ERROR_SUCCESS) {
-        wchar_t imagePath[MAX_PATH];
+    std::wstring fullPath = std::wstring(SERVICES_PATH) + L"\\" + serviceName;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, fullPath.c_str(), 0, KEY_READ, &hSubKey) == ERROR_SUCCESS) {
+        wchar_t imagePath[MAX_PATH] = {0};
         DWORD size = sizeof(imagePath);
-        if (RegQueryValueExW(hSubKey, L"ImagePath", nullptr, nullptr, (LPBYTE)imagePath, &size) == ERROR_SUCCESS) {
-            std::wcout << L"[" << subKey << L"] -> " << imagePath << std::endl;
+        if (RegQueryValueExW(hSubKey, L"ImagePath", NULL, NULL, (LPBYTE)imagePath, &size) == ERROR_SUCCESS) {
+            std::wcout << L"--------------------------------------------------\n";
+            std::wcout << L"Subcheie:    " << serviceName << L"\n";
+            std::wcout << L"ImagePath:   " << imagePath << L"\n";
+            std::wcout << L"--------------------------------------------------\n";
         }
         RegCloseKey(hSubKey);
     }
@@ -15,13 +22,14 @@ void PrintImagePath(HKEY hKey, const std::wstring& subKey) {
 
 void EnumerateServices() {
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-        wchar_t subKeyName[MAX_PATH];
-        DWORD index = 0, subKeySize = MAX_PATH;
-        while (RegEnumKeyExW(hKey, index, subKeyName, &subKeySize, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
-            PrintImagePath(hKey, subKeyName);
-            subKeySize = MAX_PATH;
-            ++index;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, SERVICES_PATH, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD index = 0;
+        wchar_t serviceName[MAX_PATH];
+        DWORD nameSize = MAX_PATH;
+        while (RegEnumKeyExW(hKey, index, serviceName, &nameSize, NULL, NULL, NULL, NULL) == ERROR_SUCCESS) {
+            GetServiceImagePath(hKey, serviceName);
+            nameSize = MAX_PATH;
+            index++;
         }
         RegCloseKey(hKey);
     } else {
